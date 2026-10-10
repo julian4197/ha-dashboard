@@ -6,6 +6,8 @@
 <meta name="theme-color" content="#f1f3f1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Zuhause">
 <title>Zuhause</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
@@ -741,6 +743,7 @@ body{transition:background-color .5s var(--ease),color .5s var(--ease)}
 .links ul{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:6px}
 .links li{display:grid;gap:2px}.links code{font-size:12px;user-select:all;word-break:break-all;color:var(--text-2)}
 
+
 /* Kurz notiert */
 .brief{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));column-gap:28px;border-top:3px solid var(--text);margin:8px 0 34px}
 .brief>h3{grid-column:1/-1;margin:14px 0 4px;font-size:32px;font-weight:850;letter-spacing:-.03em}
@@ -842,6 +845,66 @@ body{transition:background-color .5s var(--ease),color .5s var(--ease)}
   .kv{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (prefers-reduced-motion:reduce){.glow,.hot span,.lamp .shade{transition:none}.hot.on::before,.droid,.stamp.run{animation:none}}
+/* ═════════════ Handy: eigene Ansicht ═════════════ */
+.more-pop{display:none}
+@media (max-width:760px){
+  .mast{padding:calc(8px + env(safe-area-inset-top)) 16px 8px;gap:0 8px}
+  .mast-title b{font-size:22px}
+  #view{padding:12px 12px calc(96px + env(safe-area-inset-bottom))}
+  /* Hinweise als eine wischbare Zeile */
+  .attn{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -12px 12px;padding:0 12px;scroll-snap-align:none}
+  .attn::-webkit-scrollbar{display:none}
+  .attn>span{flex:none}.attn button{white-space:nowrap;height:40px;font-size:14px}
+  /* Doppelseiten werden Karten: Raumbild oben, bei Info-Seiten erst der Text */
+  .spread{border-radius:24px;margin:0 0 14px;box-shadow:0 1px 0 var(--line),0 14px 30px -26px rgb(0 0 0 / .5);scroll-snap-align:none}
+  .sp-text{padding:20px 18px 18px;gap:14px}
+  .sp-text h2{font-size:clamp(34px,10.5vw,50px);max-width:none}
+  .facts{gap:2px 16px;font-size:15px}.facts b{font-size:22px}
+  .big{grid-template-columns:1fr 1fr;gap:14px 12px}
+  .big div b{font-size:clamp(26px,8vw,34px)}
+  .big div span{font-size:13.5px}
+  .spread.today .sp-art,.spread.energy .sp-art,.spread.tech .sp-art,.spread.vacs .sp-art{order:0;aspect-ratio:auto;min-height:0}
+  .sp-art figcaption{display:none}
+  .thermo{top:10px;right:10px;padding:5px 10px;gap:6px;font-size:13px}.thermo b{font-size:19px}.thermo .mdi{font-size:16px}
+  .hot{width:46px;height:46px;margin:-23px 0 0 -23px}.hot span{width:28px;height:28px;font-size:12.5px}
+  .cred .ln{min-height:52px;font-size:16px;grid-template-columns:30px minmax(0,1fr) auto;gap:10px}
+  .cred .no{width:28px;height:28px}
+  .cred .more{width:40px}
+  .vent-row{padding:10px 12px}.vent-row b{font-size:15px}
+  .lights-all{height:42px}
+  /* Heute */
+  .who span{padding:4px 12px 4px 4px}.who img,.who .mdi{width:30px;height:30px}
+  .sp-art.todayart{padding:16px 14px 18px;gap:14px}
+  .fc-row{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:62px;overflow-x:auto;scrollbar-width:none;margin:0 -14px;padding:0 14px}
+  .fc-row::-webkit-scrollbar{display:none}
+  .green{padding:12px 14px}.green b{font-size:15px}
+  .today-cols,.cols{column-gap:0}
+  .cols>section{padding:14px 2px 18px}
+  .cols h3,.brief>h3,.scene-board h3,.shelf h3,.an-h h3{font-size:24px}
+  .sc-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .sc{min-height:88px;padding:14px;border-radius:18px;gap:10px}.sc span{font-size:15px}
+  /* Energie, Technik */
+  .an-h{gap:10px}.an-nav{font-size:15px}
+  .an-bars{height:170px}
+  .net .t1{font-size:110px}
+  .printer,.nas{aspect-ratio:auto}
+  .ams{gap:10px}.spool i{width:48px;height:48px}
+  .posters{grid-auto-columns:116px;margin:0 -12px;padding:4px 12px 14px}
+  .stats li{font-size:14.5px;padding:10px 0}
+  /* Daumen-Navigation: vier Rubriken plus "Mehr" */
+  .tabbar{left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));border:1px solid var(--line);border-radius:22px;padding:6px;box-shadow:0 14px 34px -14px rgb(0 0 0 / .45);overflow:visible;background:color-mix(in srgb,var(--surface) 88%,transparent)}
+  .tabbar button{min-width:0;height:54px;justify-content:center;border-radius:16px;font-size:11.5px}
+  .tabbar button .mdi{font-size:23px}
+  .tabbar button[aria-current=page]{background:var(--rub);color:#fff}
+  .tabbar button[aria-current=page] .mdi{color:#fff}
+  .more-pop{display:grid;position:fixed;right:10px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:31;min-width:220px;padding:8px;border-radius:20px;background:var(--surface);border:1px solid var(--line);box-shadow:0 22px 50px -18px rgb(0 0 0 / .55);transform-origin:bottom right;transition:opacity .2s var(--ease),transform .25s var(--ease)}
+  .more-pop[hidden]{display:grid;opacity:0;transform:scale(.92) translateY(8px);pointer-events:none}
+  .more-pop button{all:unset;cursor:pointer;display:flex;align-items:center;gap:12px;height:50px;padding:0 14px;border-radius:14px;font-weight:650;font-size:16px}
+  .more-pop button .sw{width:12px;height:12px;border-radius:4px;background:var(--rub)}
+  .more-pop button[aria-current=page]{background:var(--surface-2)}
+  .more-pop button .mdi{font-size:21px;color:var(--text-2);margin-left:auto}
+  #saver b{font-size:26vw}#saver span{font-size:18px}#saver p{font-size:16px;padding:0 20px}
+}
 </style>
 </head>
 <body>
@@ -2432,12 +2495,13 @@ function energyCfg() {
   const p = S.energy; if (!p?.energy_sources) return null;
   const grid = p.energy_sources.filter(s => s.type === "grid");
   const cfg = {
-    gridIn: grid.flatMap(g => (g.flow_from || []).map(f => f.stat_energy_from)),
-    gridOut: grid.flatMap(g => (g.flow_to || []).map(f => f.stat_energy_to)),
+    // ältere HA-Versionen: flow_from/flow_to-Listen, neuere: stat_energy_from/_to direkt an der Netzquelle
+    gridIn: grid.flatMap(g => g.flow_from ? g.flow_from.map(f => f.stat_energy_from) : [g.stat_energy_from]).filter(Boolean),
+    gridOut: grid.flatMap(g => g.flow_to ? g.flow_to.map(f => f.stat_energy_to) : [g.stat_energy_to]).filter(Boolean),
     solar: p.energy_sources.filter(s => s.type === "solar").map(s => s.stat_energy_from),
     battIn: p.energy_sources.filter(s => s.type === "battery").map(s => s.stat_energy_to),
     battOut: p.energy_sources.filter(s => s.type === "battery").map(s => s.stat_energy_from),
-    price: grid.flatMap(g => g.flow_from || []).map(f => f.number_energy_price).find(x => x != null) ?? null,
+    price: grid.flatMap(g => g.flow_from || [g]).map(f => f.number_energy_price).find(x => x != null) ?? null,
     devices: (p.device_consumption || []).map(d => ({ id: d.stat_consumption, name: d.name, rate: d.stat_rate })),
   };
   // nur Statistiken, deren Entität es noch gibt
@@ -2887,7 +2951,11 @@ function renderNav() {
   const lit = k => ["eg", "buero", "ug"].includes(k) ? pageAreas(k).filter(Boolean).reduce((n, a) => n + roomEntities(a).filter(e => lampish(e) && isOn(e)).length, 0) : 0;
   const b = ([k, l, i, c]) => { const n = lit(k); return `<button data-view="${k}" style="--rub:var(${c})" ${S.view === k && !S.q && !S.list ? 'aria-current="page"' : ""}><span class="sw"></span><i class="mdi mdi-${i}"></i><span>${l}</span>${n ? `<em title="${n} Licht${n > 1 ? "er" : ""} an">${n}</em>` : ""}</button>`; };
   $("#nav").innerHTML = PAGES.map(b).join("");
-  $("#tabbar").innerHTML = PAGES.map(([k, l, i, c, sh]) => b([k, sh, i, c])).join("");
+  // Handy: vier Rubriken direkt, der Rest hinter "Mehr" (zeigt die aktive Rubrik, wenn sie dort liegt)
+  const main = PAGES.slice(0, 4), rest = PAGES.slice(4), inRest = rest.find(p => p[0] === S.view && !S.q && !S.list);
+  $("#tabbar").innerHTML = main.map(([k, l, i, c, sh]) => b([k, sh, i, c])).join("") + `<button data-act="more" style="--rub:var(${inRest ? inRest[3] : "--r-ix"})" ${inRest ? 'aria-current="page"' : ""} aria-expanded="false"><i class="mdi mdi-${inRest ? inRest[2] : "dots-horizontal-circle-outline"}"></i><span>${inRest ? inRest[4] : "Mehr"}</span></button>`;
+  let pop = $("#morePop"); if (!pop) { pop = document.createElement("div"); pop.id = "morePop"; pop.className = "more-pop"; pop.hidden = true; document.body.append(pop); }
+  pop.innerHTML = rest.map(([k, l, i, c]) => `<button data-view="${k}" style="--rub:var(${c})" ${S.view === k ? 'aria-current="page"' : ""}><span class="sw"></span>${l}<i class="mdi mdi-${i}"></i></button>`).join("");
 }
 function render(animate = true) {
   S._ix = index(); applyTheme(); applyRoomParam();
@@ -3506,6 +3574,12 @@ document.addEventListener("click", e => {
 setInterval(refreshAttn, 60000);
 
 let attnT;
+document.addEventListener("click", e => {
+  const pop = $("#morePop"); if (!pop) return;
+  const m = e.target.closest('[data-act="more"]');
+  if (m) { pop.hidden = !pop.hidden; m.setAttribute("aria-expanded", String(!pop.hidden)); return; }
+  if (!pop.hidden) pop.hidden = true;
+});
 /* ───────────── Laden & Live-Updates ───────────── */
 async function loadAll() {
   const c = S.conn;
