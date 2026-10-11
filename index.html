@@ -723,6 +723,10 @@ body{transition:background-color .5s var(--ease),color .5s var(--ease)}
 .sc .mdi{font-size:28px;color:rgb(var(--amber))}
 .sc span{font-size:16px;font-weight:700;line-height:1.2}
 .sc.big-sc{background:var(--text);color:var(--bg)}.sc.big-sc .mdi{color:inherit}
+.sc.pl{text-decoration:none;color:inherit;box-sizing:border-box}
+.sc.pl .mdi{color:var(--text-3)}.sc.pl.pl-due .mdi{color:rgb(var(--amber))}
+.sc.pl b{display:block;font-size:40px;font-weight:850;letter-spacing:-.03em;line-height:1;margin-bottom:6px;font-variant-numeric:tabular-nums}
+.sc.pl.pl-txt b{font-size:28px;white-space:nowrap}.sc.pl span{display:block}.sc.pl small{display:block;margin-top:3px;font-size:13px;color:var(--text-3)}
 
 /* Hinweise */
 .attn{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px;scroll-snap-align:start;scroll-margin-top:130px}
@@ -883,6 +887,7 @@ body{transition:background-color .5s var(--ease),color .5s var(--ease)}
   .cols h3,.brief>h3,.scene-board h3,.shelf h3,.an-h h3{font-size:24px}
   .sc-grid{grid-template-columns:1fr 1fr;gap:10px}
   .sc{min-height:88px;padding:14px;border-radius:18px;gap:10px}.sc span{font-size:15px}
+  .paper-board .sc-grid{grid-template-columns:1fr}.sc.pl{flex-direction:row;align-items:center;justify-content:flex-start;gap:14px;min-height:0}.sc.pl b{font-size:28px;margin-bottom:2px}
   /* Energie, Technik */
   .an-h{gap:10px}.an-nav{font-size:15px}
   .an-bars{height:170px}
@@ -1074,6 +1079,9 @@ function buildDemo() {
   add("media_player.buero_lautsprecher", "playing", { friendly_name: "Büro Lautsprecher", device_class: "speaker", media_title: "Deep Focus", media_artist: "Spotify", volume_level: .18, is_volume_muted: false, entity_picture: art("#264653", "#8ab17d", "Focus"), supported_features: 152461 }, { area: "buero" });
   T("buero_co2", "Büro CO₂", "buero", 870, "carbon_dioxide", "ppm");
   T("buero_temperatur", "Büro Temperatur", "buero", 22.6);
+  add("sensor.http_192_168_178_72_8010_documents_in_inbox", "4", { friendly_name: "Paperless Posteingang", unit_of_measurement: "Dokumente" });
+  add("input_number.paperless_zu_bezahlen", "2", { friendly_name: "Paperless zu bezahlen", min: 0, max: 999, step: 1 });
+  add("input_text.paperless_nachste_frist", `${new Date(Date.now() + 2 * 864e5).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })} Hotel Stornofrist`, { friendly_name: "Paperless nächste Frist" });
   add("input_boolean.homeoffice", "on", { friendly_name: "Homeoffice-Modus", icon: "mdi:laptop" }, { area: "buero" });
 
   // Keller
@@ -3452,8 +3460,34 @@ function viewToday() {
     <section><h3>Lüften</h3>${vents.length ? vents.map(x => `<div class="vent small" data-vent="${esc(x.a.area_id)}" data-small><b>${esc(x.a.name)}</b> ${ventHTML(x.a, true)}</div>`).join("") : `<p class="empty">Überall gute Luft.</p>`}</section>
     <section><h3>Offen</h3>${opens.length ? `<ul class="stats">${opens.map(e => `<li><span>${esc(entName(e))}</span><b>seit ${esc(rel(S.states[e].last_changed))}</b></li>`).join("")}</ul>` : `<p class="empty">Alle Fenster und Türen zu.</p>`}${cal.length ? `<h3 style="margin-top:18px">Termine</h3><ul class="stats">${cal.map(e => { const a = S.states[e].attributes; return `<li><span>${esc(a.message)}</span><b>${esc(a.start_time ? new Date(a.start_time).toLocaleString("de-DE", { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }) : "")}</b></li>`; }).join("")}</ul>` : ""}</section>
   </div>
+  <div id="paperBoard">${paperHTML()}</div>
   ${scenes.length ? `<div class="scene-board"><h3>Szenen</h3><div class="sc-grid">${[["all-off", "Alles aus", "power"], ["night", "Gute Nacht", "weather-night"]].map(([k, l, i]) => `<button class="sc big-sc" data-act="sc-${k}"><i class="mdi mdi-${i}"></i><span>${l}</span></button>`).join("")}${scenes.map(e => `<button class="sc" data-act="tg" data-e="${esc(e)}"><i class="mdi mdi-${iconOf(e)}"></i><span>${esc(entName(e))}</span></button>`).join("")}</div></div>` : ""}`;
 }
+/* Paperless: Posteingang, offene Rechnungen, nächste Frist (Werte schreibt das NAS alle 30 min nach HA) */
+const PAPERLESS_URL = "https://paperless.nashorn.work";
+const paperIds = () => { const ids = Object.keys(S.states); return { inbox: ids.find(e => /documents_in_inbox$/.test(e)), pay: ids.find(e => /paperless_zu_bezahlen$/.test(e)), due: ids.find(e => /paperless_nachste_frist$/.test(e)) }; };
+function dueDays(t) {
+  const m = /^\s*(\d{1,2})\.(\d{1,2})\.(\d{2,4})?/.exec(t || ""); if (!m) return null;
+  const now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let y = m[3] ? (+m[3] < 100 ? 2000 + +m[3] : +m[3]) : now.getFullYear(), d = new Date(y, +m[2] - 1, +m[1]);
+  if (!m[3] && d - today < -60 * 864e5) d = new Date(y + 1, +m[2] - 1, +m[1]);
+  return Math.round((d - today) / 864e5);
+}
+function paperHTML() {
+  const p = paperIds(); if (!p.inbox && !p.pay && !p.due) return "";
+  const ok = e => e && !["unknown", "unavailable", ""].includes(S.states[e]?.state);
+  const n = e => ok(e) ? Math.round(+S.states[e].state) : null;
+  const inbox = n(p.inbox), pay = n(p.pay), due = ok(p.due) ? String(S.states[p.due].state).trim() : "", days = dueDays(due);
+  const dueTxt = due.replace(/^\s*\d{1,2}\.\d{1,2}\.(\d{2,4})?[.:,\s-]*/, "") || due;
+  const when = days == null ? "" : days < 0 ? "überfällig" : days === 0 ? "heute" : days === 1 ? "morgen" : `in ${days} Tagen`;
+  const tile = (icon, val, label, sub, hot) => `<a class="sc pl${hot ? " pl-due" : ""}${/^\d+$|^–$/.test(String(val)) ? "" : " pl-txt"}" href="${PAPERLESS_URL}" target="_blank" rel="noopener"><i class="mdi mdi-${icon}"></i><div><b>${val}</b><span>${label}</span>${sub ? `<small>${sub}</small>` : ""}</div></a>`;
+  return `<div class="scene-board paper-board"><h3>Papierkram</h3><div class="sc-grid">
+    ${tile("inbox-arrow-down-outline", inbox ?? "–", inbox === 1 ? "Dokument im Posteingang" : "Dokumente im Posteingang", inbox ? "noch einsortieren" : "alles einsortiert", inbox > 0)}
+    ${tile("cash-clock", pay ?? "–", pay === 1 ? "Rechnung offen" : "Rechnungen offen", pay ? "noch bezahlen" : "nichts offen", pay > 0)}
+    ${tile("calendar-alert-outline", due ? esc(when || due.split(" ")[0]) : "–", due ? esc(dueTxt) : "Keine Frist", due && when ? esc(due.split(" ")[0]) : "nächste Frist", days != null && days <= 3)}
+  </div></div>`;
+}
+function refreshPaper(eid) { if (!/documents_in_inbox$|paperless_zu_bezahlen$|paperless_nachste_frist$/.test(eid)) return; const b = $("#paperBoard"); if (b) b.innerHTML = paperHTML(); }
 function runningNow() {
   const out = [], st = e => S.states[e]?.state;
   const dw = Object.keys(S.states).find(e => /geschirrspuler_operation_state$/.test(e));
@@ -3611,7 +3645,7 @@ async function start(conn) {
     if (new_state) S.states[eid] = new_state; else delete S.states[eid];
     if (!existed || !new_state) { clearTimeout(rerenderT); rerenderT = setTimeout(() => render(false), 400); return; }
     if (pendingT.has(eid)) { clearTimeout(pendingT.get(eid)); pendingT.delete(eid); }
-    updateEntity(eid); refreshSummaries(eid); liveView(eid);
+    updateEntity(eid); refreshSummaries(eid); liveView(eid); refreshPaper(eid);
     if (dom(eid) === "light") updateAmbient();
     if (sheetEid === eid && !sheetBusy && !climT.has(eid)) renderSheet();
   });
