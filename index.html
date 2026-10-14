@@ -219,6 +219,8 @@ td code,.mono{font:500 12px ui-monospace,SFMono-Regular,Menlo,monospace;color:va
 .connect form{width:min(440px,100%);background:rgb(22 23 27 / .82);backdrop-filter:blur(24px);border:1px solid var(--line);border-radius:24px;padding:30px}
 .connect h1{margin:0 0 6px;font-size:26px;letter-spacing:-.03em}
 .connect p{margin:0 0 20px;color:var(--text-2);font-size:14px}
+.connect .tokbox{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
+.connect .tokbox summary{cursor:pointer;color:var(--text-2);font-size:14px;margin-bottom:12px}
 .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
 .field label{font-size:13px;font-weight:600;color:var(--text-2)}
 .field input{height:44px;border-radius:12px;border:1px solid var(--line-2);background:var(--bg);padding:0 14px;outline:none;transition:border-color .2s}
@@ -918,21 +920,24 @@ body{transition:background-color .5s var(--ease),color .5s var(--ease)}
 <div class="connect" id="connect" hidden>
   <form id="connectForm" autocomplete="on">
     <h1>Mit Home Assistant verbinden</h1>
-    <p>Die Seite spricht direkt mit deinem Home Assistant über die WebSocket-API. Zugangsdaten bleiben nur in diesem Browser gespeichert.</p>
+    <p>Du meldest dich auf der Anmeldeseite deines Home Assistant an. Danach bleibt dieses Gerät angemeldet; abmelden kannst du es jederzeit in Home Assistant unter Profil → Sicherheit.</p>
     <div class="field">
       <label for="haUrl">Adresse</label>
       <input id="haUrl" name="url" inputmode="url" placeholder="http://homeassistant.local:8123" required>
     </div>
+    <p class="err" id="connectErr" role="alert"></p>
+    <div class="btnrow">
+      <button class="btn primary" type="button" id="loginBtn"><i class="mdi mdi-login"></i>Mit Home Assistant anmelden</button>
+      <button class="btn" type="button" id="demoBtn"><i class="mdi mdi-home-variant-outline"></i>Demo ansehen</button>
+    </div>
+    <details class="tokbox"><summary>Stattdessen mit Zugriffstoken verbinden</summary>
     <div class="field">
       <label for="haToken">Langlebiges Zugriffstoken</label>
       <input id="haToken" name="token" type="password" autocomplete="off" placeholder="eyJhbGciOi…">
-      <small>Erstellen unter Profil → Sicherheit → Langlebige Zugriffstokens. Leer lassen, wenn diese Seite auf Home Assistant selbst liegt und du dort angemeldet bist.</small>
+      <small>Erstellen unter Profil → Sicherheit → Langlebige Zugriffstokens. Am besten für einen Benutzer ohne Admin-Rechte.</small>
     </div>
-    <p class="err" id="connectErr" role="alert"></p>
-    <div class="btnrow">
-      <button class="btn primary" type="submit"><i class="mdi mdi-connection"></i>Verbinden</button>
-      <button class="btn" type="button" id="demoBtn"><i class="mdi mdi-home-variant-outline"></i>Demo ansehen</button>
-    </div>
+    <div class="btnrow"><button class="btn" type="submit"><i class="mdi mdi-connection"></i>Mit Token verbinden</button></div>
+    </details>
   </form>
 </div>
 
@@ -1383,6 +1388,44 @@ async function frontendToken(url) {
   const n = await r.json(); t.access_token = n.access_token; t.expires = Date.now() + n.expires_in * 1000;
   localStorage.setItem("hassTokens", JSON.stringify(t)); return n.access_token;
 }
+
+/* Anmeldung über Home Assistant (wie die offizielle App): kein fester Token, HA gibt kurzlebige Schlüssel, die sich selbst erneuern */
+const CLIENT_ID = location.origin + location.pathname.replace(/[^/]*$/, "");
+const REDIRECT_URI = CLIENT_ID + "?auth_callback=1";
+const oauthGet = url => { try { const t = JSON.parse(localStorage.getItem("haAuth")); return t && normalizeUrl(t.hassUrl) === url ? t : null; } catch { return null; } };
+async function oauthTokenCall(url, body) {
+  let r;
+  try { r = await fetch(url + "/auth/token", { method: "POST", body: new URLSearchParams({ client_id: CLIENT_ID, ...body }) }); }
+  catch { throw Object.assign(new Error("cors"), { cors: true }); }
+  if (!r.ok) throw Object.assign(new Error("Anmeldung abgelaufen oder abgemeldet. Bitte neu anmelden."), { auth: true, gone: r.status === 400 || r.status === 403 });
+  return r.json();
+}
+async function oauthToken(url) {
+  const t = oauthGet(url); if (!t) return null;
+  if (t.access_token && t.expires > Date.now() + 60000) return t.access_token;
+  try {
+    const n = await oauthTokenCall(url, { grant_type: "refresh_token", refresh_token: t.refresh_token });
+    t.access_token = n.access_token; t.expires = Date.now() + n.expires_in * 1000;
+    localStorage.setItem("haAuth", JSON.stringify(t)); return n.access_token;
+  } catch (e) { if (e.gone) localStorage.removeItem("haAuth"); throw e; }
+}
+function oauthStart(url) {
+  const state = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, "0")).join("");
+  sessionStorage.setItem("haAuthPending", JSON.stringify({ url, state }));
+  location.href = `${url}/auth/authorize?response_type=code&client_id=${encodeURIComponent(CLIENT_ID)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&state=${state}`;
+}
+async function oauthCallback() {
+  const qs = new URLSearchParams(location.search); if (!qs.has("auth_callback")) return null;
+  history.replaceState(null, "", location.pathname);
+  let p; try { p = JSON.parse(sessionStorage.getItem("haAuthPending")); } catch {}
+  sessionStorage.removeItem("haAuthPending");
+  if (!p || p.state !== qs.get("state") || !qs.get("code")) throw new Error("Anmeldung abgebrochen. Bitte noch einmal versuchen.");
+  const n = await oauthTokenCall(p.url, { grant_type: "authorization_code", code: qs.get("code") });
+  localStorage.setItem("haAuth", JSON.stringify({ hassUrl: p.url, refresh_token: n.refresh_token, access_token: n.access_token, expires: Date.now() + n.expires_in * 1000 }));
+  store.set("url", p.url); store.set("token", null);
+  return p.url;
+}
+const CORS_HELP = () => `Home Assistant erlaubt die Anmeldung von dieser Seite noch nicht. Einmalig in der configuration.yaml unter "http:" ergänzen: cors_allowed_origins: - ${location.origin} und Home Assistant neu starten.`;
 
 /* ───────────── Zustand ───────────── */
 const S = {
@@ -3665,10 +3708,10 @@ async function connectWith(url, token, remember) {
   const err = $("#connectErr"); err.textContent = "";
   if (location.protocol === "https:" && url.startsWith("http:")) { err.textContent = "Diese Seite läuft über HTTPS, Home Assistant über HTTP. Browser blockieren das. Lege die Seite auf Home Assistant (/local/) oder nutze die HTTPS-Adresse."; return; }
   S.base = url;
-  const auth = async () => token || (await frontendToken(url)) || Promise.reject(Object.assign(new Error("Bitte ein Zugriffstoken eintragen."), { auth: true }));
+  const auth = async () => token || (await oauthToken(url)) || (await frontendToken(url)) || Promise.reject(Object.assign(new Error("Bitte mit Home Assistant anmelden."), { auth: true }));
   const conn = new HA(url, auth);
   try { await conn.connect(); }
-  catch (e) { err.textContent = e.auth ? (e.message.includes("Token") ? e.message : "Anmeldung fehlgeschlagen: " + e.message) : `Keine Verbindung zu ${url}. Ist die Adresse richtig und Home Assistant im selben Netz erreichbar?`; return; }
+  catch (e) { err.textContent = e.cors ? CORS_HELP() : e.auth ? (e.message.includes("Token") ? e.message : "Anmeldung fehlgeschlagen: " + e.message) : `Keine Verbindung zu ${url}. Ist die Adresse richtig und Home Assistant im selben Netz erreichbar?`; return; }
   if (remember) { store.set("url", url); if (token) store.set("token", token); }
   start(conn).catch(e => showConnect("Laden fehlgeschlagen: " + e.message));
 }
@@ -3679,6 +3722,12 @@ $("#connectForm").addEventListener("submit", e => {
   connectWith(url, $("#haToken").value.trim(), true);
 });
 $("#demoBtn").addEventListener("click", () => startDemo());
+$("#loginBtn").addEventListener("click", () => {
+  const url = normalizeUrl($("#haUrl").value);
+  if (!url) { $("#connectErr").textContent = "Bitte zuerst die Adresse deines Home Assistant eintragen, z. B. die Nabu-Casa-Adresse."; return; }
+  if (location.protocol === "https:" && url.startsWith("http:")) { $("#connectErr").textContent = "Diese Seite läuft über HTTPS. Bitte die HTTPS-Adresse (Nabu Casa) eintragen."; return; }
+  store.set("url", url); oauthStart(url);
+});
 function startDemo() {
   S.demo = true; S.base = "";
   const conn = new HA("demo", async () => "demo", () => new DemoSocket());
@@ -3696,13 +3745,19 @@ $("#settingsBtn").addEventListener("click", () => {
   card.querySelector("[data-close]").onclick = closeSheet;
   $("#optHidden").onchange = e => { S.showHidden = e.target.checked; store.set("hidden", S.showHidden ? "1" : null); render(false); };
   $("#optReload").onclick = async () => { await loadAll(); render(); closeSheet(); };
-  $("#optLogout").onclick = () => { store.set("token", null); if (S.demo) store.set("demo", null); location.reload(); };
+  $("#optLogout").onclick = async () => {
+    const t = oauthGet(S.base);
+    if (t) { localStorage.removeItem("haAuth"); await fetch(S.base + "/auth/revoke", { method: "POST", body: new URLSearchParams({ token: t.refresh_token }) }).catch(() => {}); }
+    store.set("token", null); if (S.demo) store.set("demo", null); location.reload();
+  };
   sheet.showModal();
   G?.fromTo(card, { yPercent: innerWidth <= 640 ? 100 : 4, opacity: innerWidth <= 640 ? 1 : 0 }, { yPercent: 0, opacity: 1, duration: .4, ease: "expo.out", clearProps: "transform,opacity" });
 });
 
 /* Start */
-(function boot() {
+(async function boot() {
+  try { const u = await oauthCallback(); if (u) { $("#haUrl").value = u; return connectWith(u, null, false).then(() => { if (!S.conn) showConnect($("#connectErr").textContent); }); } }
+  catch (e) { showConnect(e.cors ? CORS_HELP() : e.message); return; }
   const qs = new URLSearchParams(location.search);
   if (qs.has("demo")) return startDemo();
   // Token aus dem macOS-Schlüsselbund, vom Starter "Dashboard öffnen.command" als #token=… übergeben; sofort aus der Adresszeile entfernen
@@ -3710,7 +3765,7 @@ $("#settingsBtn").addEventListener("click", () => {
   if (hashTok) { store.set("token", hashTok); history.replaceState(null, "", location.pathname + location.search); }
   const url = normalizeUrl(qs.get("url") || store.get("url") || defaultUrl());
   const token = store.get("token");
-  if (token || (url === location.origin && localStorage.getItem("hassTokens"))) { S.base = url; $("#haUrl").value = url; connectWith(url, token, false).then(() => { if (!S.conn) showConnect($("#connectErr").textContent); }); }
+  if (token || oauthGet(url) || (url === location.origin && localStorage.getItem("hassTokens"))) { S.base = url; $("#haUrl").value = url; connectWith(url, token, false).then(() => { if (!S.conn) showConnect($("#connectErr").textContent); }); }
   else showConnect();
 })();
 </script>
